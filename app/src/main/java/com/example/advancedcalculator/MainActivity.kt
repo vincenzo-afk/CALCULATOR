@@ -1,30 +1,143 @@
 package com.example.advancedcalculator
 
+import android.content.Context
 import android.os.Bundle
-import android.util.Log
+import android.view.View
+import android.view.inputmethod.InputMethodManager
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import java.util.*
 
 class MainActivity : AppCompatActivity() {
 
-    // Hardcoded currency rates relative to USD
-    private val currencyRates = mapOf(
-        "USD" to 1.0,
-        "EUR" to 0.91,
-        "INR" to 82.0,
-        "JPY" to 134.0,
-        "GBP" to 0.78
-    )
+    private lateinit var expressionEvaluator: ExpressionEvaluator
+
+    // Memory register for M+, M-, MR, MC
+    private var memory: Double = 0.0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Find UI elements by their IDs
-        val inputCalc = findViewById<EditText>(R.id.inputCalc)
-        val btnCalculate = findViewById<Button>(R.id.btnCalculate)
-        val txtCalcResult = findViewById<TextView>(R.id.txtCalcResult)
+        expressionEvaluator = ExpressionEvaluator()
 
+        val displayInput = findViewById<EditText>(R.id.displayInput)
+        val displayResult = findViewById<TextView>(R.id.displayResult)
+        val memoryLabel = findViewById<TextView>(R.id.memoryLabel)
+        val angleModeBtn = findViewById<ToggleButton>(R.id.btnAngleMode)
+
+        // Keep the display as a read-only keypad output (soft keyboard hidden)
+        displayInput.keyListener = null
+        displayInput.setText("")
+        displayResult.text = "0"
+        updateMemoryLabel(memoryLabel)
+
+        // ---------------- Calculator keypad ----------------
+        val buttons: Map<Int, String> = mapOf(
+            R.id.btn0 to "0", R.id.btn1 to "1", R.id.btn2 to "2", R.id.btn3 to "3",
+            R.id.btn4 to "4", R.id.btn5 to "5", R.id.btn6 to "6", R.id.btn7 to "7",
+            R.id.btn8 to "8", R.id.btn9 to "9",
+            R.id.btnDot to ".", R.id.btnOpenParen to "(", R.id.btnCloseParen to ")",
+            R.id.btnAdd to "+", R.id.btnSub to "−", R.id.btnMul to "×", R.id.btnDiv to "÷",
+            R.id.btnMod to "%", R.id.btnPow to "^", R.id.btnPi to "π", R.id.btnE to "e",
+            R.id.btnSqrt to "√(", R.id.btnSq to "²",
+            R.id.btnSin to "sin(", R.id.btnCos to "cos(", R.id.btnTan to "tan(",
+            R.id.btnLog to "log(", R.id.btnLn to "ln(", R.id.btnFact to "!",
+            R.id.btnPercent to "%%",      // display "x%" as (x/100)
+            R.id.btnAns to "Ans", R.id.btnSwap to "±",
+            R.id.btnAc to "AC", R.id.btnDel to "DEL", R.id.btnEq to "=",
+            R.id.btnMemAdd to "M+", R.id.btnMemSub to "M-",
+            R.id.btnMemRecall to "MR", R.id.btnMemClear to "MC"
+        )
+
+        var lastAnswer: Double = 0.0
+
+        fun refreshDisplay() {
+            val expr = displayInput.text?.toString().orEmpty()
+            displayResult.text = if (expr.isEmpty()) "0" else try {
+                val preview = expressionEvaluator.evaluate(expr)
+                formatResult(preview)
+            } catch (_: Exception) {
+                ""
+            }
+        }
+
+        fun onButtonClick(token: String) {
+            val input = displayInput
+            val text = input.text.toString()
+            val insert = when (token) {
+                "AC" -> { input.setText(""); refreshDisplay(); return }
+                "DEL" -> {
+                    if (text.isNotEmpty()) input.setText(text.dropLast(1))
+                    refreshDisplay()
+                    return
+                }
+                "±" -> {
+                    val neg = if (text.startsWith("−")) text.drop(1) else "−$text"
+                    input.setText(neg); refreshDisplay(); return
+                }
+                "=" -> {
+                    try {
+                        lastAnswer = expressionEvaluator.evaluate(text)
+                        displayResult.text = formatResult(lastAnswer)
+                        input.setText(formatResult(lastAnswer))
+                    } catch (e: ExpressionEvaluator.EvalError) {
+                        displayResult.text = e.message ?: "Error"
+                    }
+                    return
+                }
+                "M+" -> {
+                    try {
+                        memory += expressionEvaluator.evaluate(text)
+                    } catch (_: Exception) { /* ignore bad expression */ }
+                    updateMemoryLabel(memoryLabel); return
+                }
+                "M-" -> {
+                    try {
+                        memory -= expressionEvaluator.evaluate(text)
+                    } catch (_: Exception) { /* ignore bad expression */ }
+                    updateMemoryLabel(memoryLabel); return
+                }
+                "MR" -> {
+                    input.setText(text + formatResult(memory)); refreshDisplay(); return
+                }
+                "MC" -> {
+                    memory = 0.0; updateMemoryLabel(memoryLabel); return
+                }
+                "DEG" -> {
+                    val rad = !angleModeBtn.isChecked
+                    expressionEvaluator = ExpressionEvaluator(
+                        if (rad) ExpressionEvaluator.AngleUnit.RADIAN else ExpressionEvaluator.AngleUnit.DEGREE
+                    )
+                    refreshDisplay(); return
+                }
+                "Ans" -> formatResult(lastAnswer)
+                "x²" -> "^(2)"
+                "%%" -> "/(100)"
+                else -> token
+            }
+            input.setText(text + insert)
+            refreshDisplay()
+        }
+
+        buttons.forEach { (id, token) ->
+            findViewById<Button>(id).setOnClickListener { onButtonClick(token) }
+        }
+
+        // Swap angles toggle (DEG/RAD)
+        angleModeBtn.setOnCheckedChangeListener { _, isChecked ->
+            // isChecked == true  => RADIAN, false => DEGREE
+            expressionEvaluator = ExpressionEvaluator(
+                if (isChecked) ExpressionEvaluator.AngleUnit.RADIAN else ExpressionEvaluator.AngleUnit.DEGREE
+            )
+            refreshDisplay()
+        }
+
+        // Prevent soft keyboard focus
+        displayInput.isFocusable = false
+        displayInput.isCursorVisible = false
+
+        // ---------------- Converter section ----------------
         val spinnerConversionType = findViewById<Spinner>(R.id.spinnerConversionType)
         val spinnerFromUnit = findViewById<Spinner>(R.id.spinnerFromUnit)
         val spinnerToUnit = findViewById<Spinner>(R.id.spinnerToUnit)
@@ -32,25 +145,23 @@ class MainActivity : AppCompatActivity() {
         val btnConvert = findViewById<Button>(R.id.btnConvert)
         val txtConversionResult = findViewById<TextView>(R.id.txtConversionResult)
 
-        // Define conversion types and units
-        val conversionTypes = listOf("Length", "Weight (Solid)", "Volume (Liquid)", "Currency")
-        val lengthUnits = listOf("Meter", "Kilometer", "Centimeter", "Inch", "Foot")
-        val weightUnits = listOf("Gram", "Kilogram", "Pound", "Ounce")
-        val volumeUnits = listOf("Liter", "Milliliter", "Gallon", "Cup")
-        val currencyUnits = currencyRates.keys.toList()
+        val conversionTypes = listOf("Length", "Weight", "Volume", "Temperature", "Currency")
+        val lengthUnits = listOf("Millimeter", "Centimeter", "Meter", "Kilometer", "Inch", "Foot", "Yard", "Mile", "Nautical Mile")
+        val weightUnits = listOf("Milligram", "Gram", "Kilogram", "Ounce", "Pound", "Stone", "Metric Ton")
+        val volumeUnits = listOf("Milliliter", "Liter", "Cup (US)", "Pint (US)", "Quart (US)", "Gallon (US)", "Fluid Ounce (US)", "Tablespoon (US)", "Teaspoon (US)")
+        val currencyUnits = CurrencyRepository.getCurrencies(this)
 
-        // Set up spinner for conversion types
         val conversionTypeAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, conversionTypes)
         conversionTypeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinnerConversionType.adapter = conversionTypeAdapter
 
-        // When user selects a conversion type, update the unit spinners accordingly
         spinnerConversionType.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>, view: android.view.View?, position: Int, id: Long) {
+            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
                 val units = when (conversionTypes[position]) {
                     "Length" -> lengthUnits
-                    "Weight (Solid)" -> weightUnits
-                    "Volume (Liquid)" -> volumeUnits
+                    "Weight" -> weightUnits
+                    "Volume" -> volumeUnits
+                    "Temperature" -> listOf("Celsius", "Fahrenheit", "Kelvin")
                     "Currency" -> currencyUnits
                     else -> listOf()
                 }
@@ -61,33 +172,23 @@ class MainActivity : AppCompatActivity() {
             }
             override fun onNothingSelected(parent: AdapterView<*>) {}
         }
+        // Trigger initial population
+        spinnerConversionType.setSelection(0, false)
+        spinnerConversionType.performItemClick(
+            spinnerConversionType.getChildAt(0), 0,
+            spinnerConversionType.adapter.getItemId(0)
+        )
 
-        // Calculator button click listener
-        btnCalculate.setOnClickListener {
-            val expression = inputCalc.text.toString()
-            val result = eval(expression)
-            // Check if the result is NaN (Not a Number), which indicates an error
-            if (result.isNaN()) {
-                txtCalcResult.text = "Invalid Expression"
-            } else {
-                txtCalcResult.text = "Result: $result"
-            }
-        }
-
-        // Convert button click listener
         btnConvert.setOnClickListener {
-            // FIXED: Safely get the selected items. This prevents the app from crashing.
             val fromUnitItem = spinnerFromUnit.selectedItem
             val toUnitItem = spinnerToUnit.selectedItem
             val conversionTypeItem = spinnerConversionType.selectedItem
 
-            // FIXED: Check if any spinner is unselected (null). If so, show a message and stop.
             if (fromUnitItem == null || toUnitItem == null || conversionTypeItem == null) {
                 Toast.makeText(this, "Please ensure all units are selected", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
-            // Now it's safe to convert them to strings
             val fromUnit = fromUnitItem.toString()
             val toUnit = toUnitItem.toString()
             val conversionType = conversionTypeItem.toString()
@@ -106,101 +207,77 @@ class MainActivity : AppCompatActivity() {
 
             val convertedValue = when (conversionType) {
                 "Length" -> convertLength(value, fromUnit, toUnit)
-                "Weight (Solid)" -> convertWeight(value, fromUnit, toUnit)
-                "Volume (Liquid)" -> convertVolume(value, fromUnit, toUnit)
-                "Currency" -> convertCurrency(value, fromUnit, toUnit)
+                "Weight" -> convertWeight(value, fromUnit, toUnit)
+                "Volume" -> convertVolume(value, fromUnit, toUnit)
+                "Temperature" -> convertTemperature(value, fromUnit, toUnit)
+                "Currency" -> CurrencyRepository.convert(this, value, fromUnit, toUnit)
                 else -> null
             }
 
             if (convertedValue == null) {
                 txtConversionResult.text = "Conversion not supported"
             } else {
-                txtConversionResult.text = "$value $fromUnit = $convertedValue $toUnit"
+                txtConversionResult.text = "$value $fromUnit = ${formatResult(convertedValue)} $toUnit"
             }
         }
-    }
 
-    // Evaluate math expression using JavaScript engine
-    private fun eval(expr: String): Double {
-        val rhinoContext = org.mozilla.javascript.Context.enter()
-        // FIXED: Use a try...finally block. This guarantees that Context.exit() is always
-        // called, even if an error occurs. This prevents resource leaks and crashes.
-        try {
-            rhinoContext.optimizationLevel = -1 // Necessary for Android compatibility
-            val scope: org.mozilla.javascript.Scriptable = rhinoContext.initStandardObjects()
-            val result = rhinoContext.evaluateString(scope, expr, "JavaScript", 1, null)
-            return (result as? Number)?.toDouble() ?: Double.NaN // Handle potential type issues
-        } catch (e: Exception) {
-            // Log the error for debugging purposes
-            Log.e("EvalError", "Could not evaluate expression: $expr", e)
-            return Double.NaN // Return NaN to indicate an error
-        } finally {
-            // This block will always execute, ensuring we don't leak resources.
-            org.mozilla.javascript.Context.exit()
+        // Hide keyboard when tapping outside inputs
+        findViewById<View>(android.R.id.content).setOnClickListener {
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.hideSoftInputFromWindow(currentFocus?.windowToken, 0)
         }
     }
 
-    // --- Conversion Helper Functions ---
+    private fun updateMemoryLabel(label: TextView) {
+        label.visibility = if (memory != 0.0) View.VISIBLE else View.GONE
+        if (memory != 0.0) label.text = "M = ${formatResult(memory)}"
+    }
+
+    // ---------------- Conversion helpers ----------------
+    // All length factors convert to meters; weight to grams; volume to liters.
 
     private fun convertLength(value: Double, from: String, to: String): Double? {
-        val toMeters = when (from) {
-            "Meter" -> 1.0
-            "Kilometer" -> 1000.0
-            "Centimeter" -> 0.01
-            "Inch" -> 0.0254
-            "Foot" -> 0.3048
-            else -> return null
-        }
-        val fromMeters = when (to) {
-            "Meter" -> 1.0
-            "Kilometer" -> 1000.0
-            "Centimeter" -> 0.01
-            "Inch" -> 0.0254
-            "Foot" -> 0.3048
-            else -> return null
-        }
-        return value * toMeters / fromMeters
+        val m = mapOf(
+            "Millimeter" to 0.001, "Centimeter" to 0.01, "Meter" to 1.0,
+            "Kilometer" to 1000.0, "Inch" to 0.0254, "Foot" to 0.3048,
+            "Yard" to 0.9144, "Mile" to 1609.344, "Nautical Mile" to 1852.0
+        )
+        return value * (m[from] ?: return null) / (m[to] ?: return null)
     }
 
     private fun convertWeight(value: Double, from: String, to: String): Double? {
-        val toGrams = when (from) {
-            "Gram" -> 1.0
-            "Kilogram" -> 1000.0
-            "Pound" -> 453.592
-            "Ounce" -> 28.3495
-            else -> return null
-        }
-        val fromGrams = when (to) {
-            "Gram" -> 1.0
-            "Kilogram" -> 1000.0
-            "Pound" -> 453.592
-            "Ounce" -> 28.3495
-            else -> return null
-        }
-        return value * toGrams / fromGrams
+        val g = mapOf(
+            "Milligram" to 0.001, "Gram" to 1.0, "Kilogram" to 1000.0,
+            "Ounce" to 28.349523125, "Pound" to 453.59237,
+            "Stone" to 6350.29318, "Metric Ton" to 1_000_000.0
+        )
+        return value * (g[from] ?: return null) / (g[to] ?: return null)
     }
 
     private fun convertVolume(value: Double, from: String, to: String): Double? {
-        val toLiters = when (from) {
-            "Liter" -> 1.0
-            "Milliliter" -> 0.001
-            "Gallon" -> 3.78541
-            "Cup" -> 0.24
-            else -> return null
-        }
-        val fromLiters = when (to) {
-            "Liter" -> 1.0
-            "Milliliter" -> 0.001
-            "Gallon" -> 3.78541
-            "Cup" -> 0.24
-            else -> return null
-        }
-        return value * toLiters / fromLiters
+        val l = mapOf(
+            "Milliliter" to 0.001, "Liter" to 1.0, "Cup (US)" to 0.2365882365,
+            "Pint (US)" to 0.473176473, "Quart (US)" to 0.946352946,
+            "Gallon (US)" to 3.785411784, "Fluid Ounce (US)" to 0.0295735295625,
+            "Tablespoon (US)" to 0.01478676478125, "Teaspoon (US)" to 0.00492892159375
+        )
+        return value * (l[from] ?: return null) / (l[to] ?: return null)
     }
 
-    private fun convertCurrency(value: Double, from: String, to: String): Double? {
-        val fromRate = currencyRates[from] ?: return null
-        val toRate = currencyRates[to] ?: return null
-        return value / fromRate * toRate
+    private fun convertTemperature(value: Double, from: String, to: String): Double? {
+        // Convert everything to Kelvin first (absolute scale handles negatives correctly)
+        val kelvin = when (from) {
+            "Celsius" -> value + 273.15
+            "Fahrenheit" -> (value - 32) * 5 / 9 + 273.15
+            "Kelvin" -> value
+            else -> return null
+        }
+        if (kelvin < 0) return null // below absolute zero
+        return when (to) {
+            "Celsius" -> kelvin - 273.15
+            "Fahrenheit" -> (kelvin - 273.15) * 9 / 5 + 32
+            "Kelvin" -> kelvin
+            else -> null
+        }
     }
 }

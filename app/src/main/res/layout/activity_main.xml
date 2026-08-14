@@ -1,108 +1,582 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="#1E1E1E">
 
     <LinearLayout
-        android:orientation="vertical"
-        android:padding="16dp"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp">
 
-        <!-- Calculator Section -->
+        <!-- ================= CALCULATOR SECTION ================= -->
         <TextView
-            android:text="Calculator"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
-
-        <EditText
-            android:id="@+id/inputCalc"
-            android:hint="Enter expression e.g. 2+3*4"
-            android:inputType="text"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
-
-        <Button
-            android:id="@+id/btnCalculate"
-            android:text="Calculate"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp" />
+            android:layout_marginBottom="6dp"
+            android:text="Calculator"
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
+            android:textStyle="bold" />
 
         <TextView
-            android:id="@+id/txtCalcResult"
-            android:text="Result:"
-            android:textSize="16sp"
-            android:layout_marginTop="8dp"
+            android:id="@+id/memoryLabel"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:textColor="#F0B429"
+            android:textSize="13sp"
+            android:visibility="gone" />
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#2C2C2E"
+            android:orientation="vertical"
+            android:padding="14dp">
+
+            <EditText
+                android:id="@+id/displayInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@null"
+                android:cursorVisible="false"
+                android:editable="false"
+                android:focusable="false"
+                android:gravity="end"
+                android:inputType="none"
+                android:textColor="#D9D9D9"
+                android:textSize="22sp" />
+
+            <TextView
+                android:id="@+id/displayResult"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="end"
+                android:text="0"
+                android:textColor="#FFFFFF"
+                android:textSize="38sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Scientific row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal">
+
+            <ToggleButton
+                android:id="@+id/btnAngleMode"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:textOff="DEG"
+                android:textOn="RAD"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/btnSin"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="sin"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btnCos"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="cos"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btnTan"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="tan"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btnLog"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="log"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btnLn"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="ln"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnMemAdd"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:text="M+"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btnMemSub"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="M-"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btnMemRecall"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="MR"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btnMemClear"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="MC"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btnSqrt"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="√("
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btnSq"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="x²"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <!-- Row: AC DEL ( % ^ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnAc"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:text="AC"
+                android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/btnDel"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="DEL"
+                android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/btnOpenParen"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="("
+                android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/btnCloseParen"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text=")"
+                android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/btnPercent"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="x%"
+                android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/btnPow"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="^"
+                android:textSize="16sp" />
+        </LinearLayout>
+
+        <!-- Row: 7 8 9 ÷ mod ! -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btn7"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:text="7"
+                android:textSize="18sp" />
+
+            <Button
+                android:id="@+id/btn8"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="8"
+                android:textSize="18sp" />
+
+            <Button
+                android:id="@+id/btn9"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="9"
+                android:textSize="18sp" />
+
+            <Button
+                android:id="@+id/btnDiv"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="÷"
+                android:textSize="18sp" />
+
+            <Button
+                android:id="@+id/btnMod"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="mod"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnFact"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="!"
+                android:textSize="18sp" />
+        </LinearLayout>
+
+        <!-- Row: 4 5 6 × π e -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btn4"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:text="4"
+                android:textSize="18sp" />
+
+            <Button
+                android:id="@+id/btn5"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="5"
+                android:textSize="18sp" />
+
+            <Button
+                android:id="@+id/btn6"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="6"
+                android:textSize="18sp" />
+
+            <Button
+                android:id="@+id/btnMul"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="×"
+                android:textSize="18sp" />
+
+            <Button
+                android:id="@+id/btnPi"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="π"
+                android:textSize="18sp" />
+
+            <Button
+                android:id="@+id/btnE"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="e"
+                android:textSize="18sp" />
+        </LinearLayout>
+
+        <!-- Row: 1 2 3 − Ans ± -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btn1"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:text="1"
+                android:textSize="18sp" />
+
+            <Button
+                android:id="@+id/btn2"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="2"
+                android:textSize="18sp" />
+
+            <Button
+                android:id="@+id/btn3"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="3"
+                android:textSize="18sp" />
+
+            <Button
+                android:id="@+id/btnSub"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="−"
+                android:textSize="18sp" />
+
+            <Button
+                android:id="@+id/btnAns"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="Ans"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnSwap"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="±"
+                android:textSize="18sp" />
+        </LinearLayout>
+
+        <!-- Row: 0 . + = -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btn0"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:text="0"
+                android:textSize="18sp" />
+
+            <Button
+                android:id="@+id/btnDot"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="."
+                android:textSize="18sp" />
+
+            <Button
+                android:id="@+id/btnAdd"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="+"
+                android:textSize="18sp" />
+
+            <Button
+                android:id="@+id/btnEq"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="2"
+                android:layout_marginStart="4dp"
+                android:text="="
+                android:textSize="22sp" />
+        </LinearLayout>
+
+        <!-- ================= CONVERTER SECTION ================= -->
         <View
-            android:layout_marginTop="16dp"
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="#CCCCCC" />
+            android:layout_marginTop="18dp"
+            android:background="#555555" />
 
-        <!-- Conversion Section -->
         <TextView
-            android:text="Unit &amp; Currency Converter"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:layout_marginTop="16dp"
-            android:layout_marginBottom="8dp"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:layout_marginBottom="8dp"
+            android:text="Unit &amp; Currency Converter"
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
+            android:textStyle="bold" />
 
         <Spinner
             android:id="@+id/spinnerConversionType"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+            android:layout_height="48dp"
+            android:background="#2C2C2E" />
 
         <LinearLayout
-            android:orientation="horizontal"
-            android:layout_marginTop="8dp"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
 
             <Spinner
                 android:id="@+id/spinnerFromUnit"
-                android:layout_weight="1"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content" />
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:background="#2C2C2E" />
 
             <Spinner
                 android:id="@+id/spinnerToUnit"
-                android:layout_weight="1"
-                android:layout_marginStart="8dp"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content" />
+                android:layout_height="48dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:background="#2C2C2E" />
         </LinearLayout>
 
         <EditText
             android:id="@+id/inputValue"
-            android:hint="Enter value"
-            android:inputType="numberDecimal"
-            android:layout_marginTop="8dp"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:hint="Enter value"
+            android:inputType="numberDecimal|numberSigned"
+            android:textColorHint="#888888" />
 
         <Button
             android:id="@+id/btnConvert"
-            android:text="Convert"
-            android:layout_marginTop="8dp"
+            style="@style/Widget.Material3.Button"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Convert" />
 
         <TextView
             android:id="@+id/txtConversionResult"
-            android:text="Conversion Result:"
-            android:textSize="16sp"
-            android:layout_marginTop="8dp"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Conversion Result:"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp" />
 
     </LinearLayout>
 </ScrollView>
