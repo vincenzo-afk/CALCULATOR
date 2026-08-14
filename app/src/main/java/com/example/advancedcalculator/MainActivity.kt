@@ -385,10 +385,10 @@ class MainActivity : AppCompatActivity() {
 
         fun setMode(mode: Mode) {
             // Reset icon colors
-            listOf(iconHistory, iconScientific, iconCurrency).forEach { it.setTextColor(0xFF8A8A8A.toInt()) }
+            listOf(iconHistory, iconScientific, iconCurrency).forEach { it.setTextColor(0xFF9A9A9A.toInt()) }
             when (mode) {
                 Mode.CALCULATOR -> {
-                    iconHistory.setTextColor(0xFF8A8A8A.toInt())
+                    iconHistory.setTextColor(0xFF9A9A9A.toInt())
                     scientificKeypad.visibility = View.GONE
                     basicKeypad.visibility = View.VISIBLE
                     converterPanel.visibility = View.GONE
@@ -397,7 +397,8 @@ class MainActivity : AppCompatActivity() {
                     displayResult.setTextColor(0xFFFF4D4D.toInt())
                 }
                 Mode.SCIENTIFIC -> {
-                    iconScientific.setTextColor(0xFFFF4D4D.toInt())
+                    iconScientific.setTextColor(0xFFFFFFFF.toInt())
+                    iconScientific.setBackgroundResource(R.drawable.mode_icon_active_background)
                     scientificKeypad.visibility = View.VISIBLE
                     basicKeypad.visibility = View.GONE
                     converterPanel.visibility = View.GONE
@@ -406,7 +407,8 @@ class MainActivity : AppCompatActivity() {
                     displayResult.setTextColor(0xFFFF4D4D.toInt())
                 }
                 Mode.HISTORY -> {
-                    iconHistory.setTextColor(0xFFFF4D4D.toInt())
+                    iconHistory.setTextColor(0xFFFFFFFF.toInt())
+                    iconHistory.setBackgroundResource(R.drawable.mode_icon_active_background)
                     scientificKeypad.visibility = View.GONE
                     basicKeypad.visibility = View.GONE
                     converterPanel.visibility = View.GONE
@@ -415,13 +417,20 @@ class MainActivity : AppCompatActivity() {
                     refreshHistoryPanel()
                 }
                 Mode.CURRENCY -> {
-                    iconCurrency.setTextColor(0xFFFF4D4D.toInt())
+                    iconCurrency.setTextColor(0xFFFFFFFF.toInt())
+                    iconCurrency.setBackgroundResource(R.drawable.mode_icon_active_background)
                     scientificKeypad.visibility = View.GONE
                     basicKeypad.visibility = View.GONE
                     converterPanel.visibility = View.VISIBLE
                     converterKeypad.visibility = View.VISIBLE
                     historyPanel.visibility = View.GONE
                     displayResult.setTextColor(0xFF666666.toInt())
+                }
+                else -> {
+                    // Back to plain calculator: restore default backgrounds
+                    iconHistory.setBackgroundResource(R.drawable.mode_icon_background)
+                    iconScientific.setBackgroundResource(R.drawable.mode_icon_background)
+                    iconCurrency.setBackgroundResource(R.drawable.mode_icon_background)
                 }
             }
         }
