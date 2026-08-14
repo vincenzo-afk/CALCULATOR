@@ -18,8 +18,12 @@ class MainActivity : AppCompatActivity() {
     // Memory register for m+, m-, mr, mc
     private var memory: Double = 0.0
 
+    // Converter panel state
+    private var converterCategory: String = "Currency"
+
     // 2nd toggle state (sin <-> asin, cos <-> acos, tan <-> atan, x² <-> x³, 10ˣ <-> log, eˣ <-> ln)
     private var secondFunction = false
+    private var lastAnswer: Double = 0.0
 
     // History stored per day: map date string -> list of entries (newest first)
     private val historyByDate = LinkedHashMap<String, MutableList<String>>()
@@ -43,7 +47,6 @@ class MainActivity : AppCompatActivity() {
         loadHistory()
 
         // ---------------- Calculator keypad ----------------
-        val lastAnswer = floatArrayOf(0.0f)
 
         fun refreshDisplay() {
             val expr = displayInput.text?.toString().orEmpty()
@@ -71,10 +74,11 @@ class MainActivity : AppCompatActivity() {
                 }
                 "=" -> {
                     try {
-                        lastAnswer[0] = expressionEvaluator.evaluate(text).toFloat()
-                        displayResult.text = formatResult(lastAnswer[0].toDouble())
-                        addToHistory(text, formatResult(lastAnswer[0].toDouble()))
-                        input.setText(formatResult(lastAnswer[0].toDouble()))
+                        lastAnswer = expressionEvaluator.evaluate(text)
+                        val result = formatResult(lastAnswer)
+                        addToHistory(text, result)
+                        displayResult.text = result
+                        input.setText(result)
                     } catch (e: ExpressionEvaluator.EvalError) {
                         displayResult.text = e.message ?: "Error"
                         addToHistory(text, "Error")
@@ -99,7 +103,7 @@ class MainActivity : AppCompatActivity() {
                 "MC" -> {
                     memory = 0.0; updateMemoryLabel(memoryLabel); return
                 }
-                "Ans" -> formatResult(lastAnswer[0].toDouble())
+                "Ans" -> formatResult(lastAnswer)
                 "DEG" -> {
                     val rad = angleModeText.text.toString() == "RAD"
                     expressionEvaluator = ExpressionEvaluator(
@@ -134,13 +138,7 @@ class MainActivity : AppCompatActivity() {
             refreshDisplay()
         }
 
-        fun wire(ids: List<Int>, map: (String) -> String) {
-            ids.forEach { id ->
-                findViewById<Button>(id).setOnClickListener { onButtonClick(map("" )) }
-            }
-        }
-
-        // Helper: shared mapping used by both keypads and the currency keypad
+        // Helper: shared mapping used by both keypads
         fun calcMap(token: String) = onButtonClick(token)
 
         val calcButtons = listOf(
@@ -166,13 +164,19 @@ class MainActivity : AppCompatActivity() {
             refreshDisplay()
         }
 
-        // 2nd toggle
+        // 2nd toggle: swaps labels (sin<->asin, cos<->acos, tan<->atan, x²<->x³, 10ˣ<->lg, eˣ<->ln)
         val angleRad = { angleModeText.text.toString() == "RAD" }
 
         val btn2nd = findViewById<Button>(R.id.btn2nd)
         btn2nd.setOnClickListener {
             secondFunction = !secondFunction
             btn2nd.setTextColor(if (secondFunction) 0xFFFF4D4D.toInt() else 0xFFFFFFFF.toInt())
+            findViewById<Button>(R.id.btnSciSin).text = if (secondFunction) "asin" else "sin"
+            findViewById<Button>(R.id.btnSciCos).text = if (secondFunction) "acos" else "cos"
+            findViewById<Button>(R.id.btnSciTan).text = if (secondFunction) "atan" else "tan"
+            findViewById<Button>(R.id.btnSciSq).text = if (secondFunction) "x³" else "x²"
+            findViewById<Button>(R.id.btnSciTenPow).text = if (secondFunction) "lg" else "10ˣ"
+            findViewById<Button>(R.id.btnSciExp).text = if (secondFunction) "ln" else "eˣ"
         }
 
         // Scientific keypad buttons
@@ -213,78 +217,127 @@ class MainActivity : AppCompatActivity() {
         val spinnerToUnit = findViewById<Spinner>(R.id.spinnerToUnit)
         val conversionResult = findViewById<TextView>(R.id.conversionResult)
         val ratesSourceNote = findViewById<TextView>(R.id.ratesSourceNote)
+        val categoryRow = findViewById<LinearLayout>(R.id.converterCategoryRow)
 
-        val currencyUnits = CurrencyRepository.getCurrencies(this)
-        val fromAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, currencyUnits)
-        fromAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        val toAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, currencyUnits)
-        toAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        spinnerFromUnit.adapter = fromAdapter
-        spinnerToUnit.adapter = toAdapter
+        var suppressSpinnerEvents = false
 
-        // Defaults: USD -> INR if available
-        val usdPos = currencyUnits.indexOf("USD")
-        val inrPos = currencyUnits.indexOf("INR")
-        if (usdPos >= 0) spinnerFromUnit.setSelection(usdPos)
-        if (inrPos >= 0 && inrPos != usdPos) spinnerToUnit.setSelection(inrPos)
-
-        fun convertCurrency() {
+        fun refreshConverter() {
+            val value = displayInput.text?.toString().orEmpty().toDoubleOrNull() ?: 0.0
             val fromItem = spinnerFromUnit.selectedItem?.toString() ?: return
             val toItem = spinnerToUnit.selectedItem?.toString() ?: return
-            val value = displayInput.text?.toString().orEmpty().toDoubleOrNull() ?: 0.0
-            val converted = CurrencyRepository.convert(this, value, fromItem, toItem)
-            if (converted == null) {
-                conversionResult.text = "0"
+            if (converterCategory == "Currency") {
+                val converted = CurrencyRepository.convert(this, value, fromItem, toItem)
+                conversionResult.text = if (converted == null) "0" else formatResult(converted)
+                val dateStr = CurrencyRepository.lastDate(this)
+                ratesSourceNote.text = "Data source: ECB reference rates${if (dateStr.isNotEmpty()) " · $dateStr" else ""}"
             } else {
-                conversionResult.text = formatResult(converted)
+                val converted = UnitConverter.convert(converterCategory, value, fromItem, toItem)
+                conversionResult.text = if (converted == null) "0" else formatResult(converted)
+                conversionResult.setTextColor(0xFFFF4D4D.toInt())
+                ratesSourceNote.text = ""
             }
-            val dateStr = CurrencyRepository.lastDate(this)
-            ratesSourceNote.text = "Data source: ECB reference rates${if (dateStr.isNotEmpty()) " · $dateStr" else ""}"
         }
 
-        fun swapCurrencies() {
+        fun setConverterCategory(category: String) {
+            converterCategory = category
+            suppressSpinnerEvents = true
+            spinnerFromUnit.adapter = null
+            spinnerToUnit.adapter = null
+            if (category == "Currency") {
+                val currencyUnits = CurrencyRepository.getCurrencies(this)
+                val fromAdapter = ArrayAdapter(this, R.layout.spinner_item_dark, currencyUnits)
+                fromAdapter.setDropDownViewResource(R.layout.spinner_item_dark)
+                val toAdapter = ArrayAdapter(this, R.layout.spinner_item_dark, currencyUnits)
+                toAdapter.setDropDownViewResource(R.layout.spinner_item_dark)
+                spinnerFromUnit.adapter = fromAdapter
+                spinnerToUnit.adapter = toAdapter
+                val usdPos = currencyUnits.indexOf("USD")
+                val inrPos = currencyUnits.indexOf("INR")
+                if (usdPos >= 0) spinnerFromUnit.setSelection(usdPos)
+                if (inrPos >= 0 && inrPos != usdPos) spinnerToUnit.setSelection(inrPos)
+                else if (currencyUnits.size > 1) spinnerToUnit.setSelection(1)
+            } else {
+                val units = UnitConverter.unitsOf(category)
+                val fromAdapter = ArrayAdapter(this, R.layout.spinner_item_dark, units)
+                fromAdapter.setDropDownViewResource(R.layout.spinner_item_dark)
+                val toAdapter = ArrayAdapter(this, R.layout.spinner_item_dark, units)
+                toAdapter.setDropDownViewResource(R.layout.spinner_item_dark)
+                spinnerFromUnit.adapter = fromAdapter
+                spinnerToUnit.adapter = toAdapter
+                if (units.size > 1) spinnerToUnit.setSelection(1)
+            }
+            suppressSpinnerEvents = false
+            refreshConverter()
+        }
+
+        fun swapUnits() {
             val tmp = spinnerFromUnit.selectedItemPosition
             spinnerFromUnit.setSelection(spinnerToUnit.selectedItemPosition)
             spinnerToUnit.setSelection(tmp)
-            convertCurrency()
+            refreshConverter()
         }
+
+        // Category selector chips
+        for (category in UnitConverter.categories()) {
+            val chip = Button(this).apply {
+                text = category
+                textSize = 13f
+                setTextColor(if (category == "Currency") 0xFFFF4D4D.toInt() else 0xFF999999.toInt())
+                background = null
+                setPadding(0, 0, 40, 0)
+                isAllCaps = false
+            }
+            chip.setOnClickListener {
+                for (i in 0 until categoryRow.childCount) {
+                    val c = categoryRow.getChildAt(i)
+                    if (c is Button) c.setTextColor(0xFF999999.toInt())
+                }
+                chip.setTextColor(0xFFFF4D4D.toInt())
+                setConverterCategory(category)
+            }
+            categoryRow.addView(chip)
+        }
+
+        spinnerFromUnit.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
+                if (!suppressSpinnerEvents) refreshConverter()
+            }
+            override fun onNothingSelected(parent: AdapterView<*>) {}
+        }
+        spinnerToUnit.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
+                if (!suppressSpinnerEvents) refreshConverter()
+            }
+            override fun onNothingSelected(parent: AdapterView<*>) {}
+        }
+        val fromCurrencyRow = findViewById<View>(R.id.fromCurrencyRow)
+        val toCurrencyRow = findViewById<View>(R.id.toCurrencyRow)
+        fromCurrencyRow.setOnClickListener { swapUnits() }
+        toCurrencyRow.setOnClickListener { swapUnits() }
 
         fun convButtonClick(token: String) {
             val input = displayInput
             val text = input.text.toString()
             val insert = when (token) {
-                "AC" -> { input.setText("0"); convertCurrency(); return }
+                "AC" -> { input.setText("0"); refreshConverter(); return }
                 "DEL" -> {
                     val next = if (text.isNotEmpty()) text.dropLast(1) else ""
                     input.setText(next)
-                    convertCurrency()
+                    refreshConverter()
                     return
                 }
-                "=" -> { convertCurrency(); return }
+                "=" -> { refreshConverter(); return }
                 "00" -> {
                     if (text == "0") input.setText(text)
                     else input.setText(text + "00")
-                    convertCurrency(); return
+                    refreshConverter(); return
                 }
                 else -> token
             }
             val next = if (text == "0") insert else text + insert
             input.setText(next)
-            convertCurrency()
+            refreshConverter()
         }
-
-        spinnerFromUnit.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) { convertCurrency() }
-            override fun onNothingSelected(parent: AdapterView<*>) {}
-        }
-        spinnerToUnit.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) { convertCurrency() }
-            override fun onNothingSelected(parent: AdapterView<*>) {}
-        }
-        val fromCurrencyRow = findViewById<View>(R.id.fromCurrencyRow)
-        val toCurrencyRow = findViewById<View>(R.id.toCurrencyRow)
-        fromCurrencyRow.setOnClickListener { swapCurrencies() }
-        toCurrencyRow.setOnClickListener { swapCurrencies() }
 
         val convButtons = listOf(
             R.id.btnConv0 to "0", R.id.btnConv1 to "1", R.id.btnConv2 to "2", R.id.btnConv3 to "3",
@@ -298,7 +351,7 @@ class MainActivity : AppCompatActivity() {
         convButtons.forEach { (id, token) -> findViewById<Button>(id).setOnClickListener { convButtonClick(token) } }
 
         // Initial conversion
-        convertCurrency()
+        setConverterCategory("Currency")
 
         // ---------------- Mode switching ----------------
         val iconHistory = findViewById<TextView>(R.id.iconHistory)
@@ -310,9 +363,9 @@ class MainActivity : AppCompatActivity() {
         val converterKeypad = findViewById<View>(R.id.converterKeypad)
         val historyPanel = findViewById<View>(R.id.historyPanel)
 
-        // Live conversion as the user types in currency mode
+        // Live conversion as the user types
         displayInput.addTextChangedListener(object : android.text.TextWatcher {
-            override fun afterTextChanged(s: android.text.Editable?) { convertCurrency() }
+            override fun afterTextChanged(s: android.text.Editable?) { refreshConverter() }
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
         })
