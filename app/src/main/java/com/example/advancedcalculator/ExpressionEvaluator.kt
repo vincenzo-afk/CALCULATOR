@@ -11,7 +11,8 @@ import kotlin.math.*
  *  Unary minus, implicit multiplication (e.g. 2(3+1), 2pi)
  *  Parentheses
  *  Constants: pi, e, tau
- *  Functions: sin, cos, tan, asin, acos, atan, log (base 10), ln, sqrt, cbrt,
+ *  Functions: sin, cos, tan, asin, acos, atan, sinh, cosh, tanh, asinh, acosh, atanh,
+ *             log (base 10), lg (base 10), ln, exp, sqrt, cbrt, inv (1/x),
  *             abs, ceil, floor, round, fact (! as postfix)
  *  Angles for trig functions can be DEGREE or RADIAN (default DEGREE like the
  *  Google Calculator app).
@@ -124,7 +125,7 @@ class ExpressionEvaluator(private val angleUnit: AngleUnit = AngleUnit.DEGREE) {
     }
 
     companion object {
-        val FUNCTIONS = setOf("sin", "cos", "tan", "asin", "acos", "atan", "log", "ln", "sqrt", "cbrt", "abs", "ceil", "floor", "round")
+        val FUNCTIONS = setOf("sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh", "asinh", "acosh", "atanh", "log", "lg", "ln", "exp", "sqrt", "cbrt", "inv", "abs", "ceil", "floor", "round")
     }
 
     // --- Recursive descent parser ---
@@ -236,10 +237,27 @@ class ExpressionEvaluator(private val angleUnit: AngleUnit = AngleUnit.DEGREE) {
             Math.toDegrees(acos(arg))
         }
         "atan" -> Math.toDegrees(atan(arg))
+        "sinh" -> sinh(arg)
+        "cosh" -> cosh(arg)
+        "tanh" -> tanh(arg)
+        "asinh" -> asinh(arg)
+        "acosh" -> {
+            if (arg < 1.0) throw EvalError.DomainError
+            acosh(arg)
+        }
+        "atanh" -> {
+            if (arg <= -1.0 || arg >= 1.0) throw EvalError.DomainError
+            atanh(arg)
+        }
+        "exp" -> {
+            if (arg > 709.0) throw EvalError.Overflow
+            exp(arg)
+        }
         "log" -> if (arg <= 0.0) throw EvalError.DomainError else log10(arg)
         "ln" -> if (arg <= 0.0) throw EvalError.DomainError else ln(arg)
         "sqrt" -> if (arg < 0.0) throw EvalError.DomainError else sqrt(arg)
         "cbrt" -> cbrt(arg)
+        "inv" -> if (arg == 0.0) throw EvalError.DivisionByZero else 1.0 / arg
         "abs" -> abs(arg)
         "ceil" -> ceil(arg)
         "floor" -> floor(arg)

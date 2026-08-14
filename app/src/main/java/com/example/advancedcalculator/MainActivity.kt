@@ -6,14 +6,23 @@ import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import java.text.SimpleDateFormat
 import java.util.*
 
 class MainActivity : AppCompatActivity() {
 
+    private enum class Mode { CALCULATOR, SCIENTIFIC, HISTORY, CURRENCY }
+
     private lateinit var expressionEvaluator: ExpressionEvaluator
 
-    // Memory register for M+, M-, MR, MC
+    // Memory register for m+, m-, mr, mc
     private var memory: Double = 0.0
+
+    // 2nd toggle state (sin <-> asin, cos <-> acos, tan <-> atan, x² <-> x³, 10ˣ <-> log, eˣ <-> ln)
+    private var secondFunction = false
+
+    // History stored per day: map date string -> list of entries (newest first)
+    private val historyByDate = LinkedHashMap<String, MutableList<String>>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -24,33 +33,17 @@ class MainActivity : AppCompatActivity() {
         val displayInput = findViewById<EditText>(R.id.displayInput)
         val displayResult = findViewById<TextView>(R.id.displayResult)
         val memoryLabel = findViewById<TextView>(R.id.memoryLabel)
-        val angleModeBtn = findViewById<ToggleButton>(R.id.btnAngleMode)
+        val angleModeText = findViewById<TextView>(R.id.angleModeText)
 
         // Keep the display as a read-only keypad output (soft keyboard hidden)
         displayInput.keyListener = null
         displayInput.setText("")
         displayResult.text = "0"
         updateMemoryLabel(memoryLabel)
+        loadHistory()
 
         // ---------------- Calculator keypad ----------------
-        val buttons: Map<Int, String> = mapOf(
-            R.id.btn0 to "0", R.id.btn1 to "1", R.id.btn2 to "2", R.id.btn3 to "3",
-            R.id.btn4 to "4", R.id.btn5 to "5", R.id.btn6 to "6", R.id.btn7 to "7",
-            R.id.btn8 to "8", R.id.btn9 to "9",
-            R.id.btnDot to ".", R.id.btnOpenParen to "(", R.id.btnCloseParen to ")",
-            R.id.btnAdd to "+", R.id.btnSub to "−", R.id.btnMul to "×", R.id.btnDiv to "÷",
-            R.id.btnMod to "%", R.id.btnPow to "^", R.id.btnPi to "π", R.id.btnE to "e",
-            R.id.btnSqrt to "√(", R.id.btnSq to "²",
-            R.id.btnSin to "sin(", R.id.btnCos to "cos(", R.id.btnTan to "tan(",
-            R.id.btnLog to "log(", R.id.btnLn to "ln(", R.id.btnFact to "!",
-            R.id.btnPercent to "%%",      // display "x%" as (x/100)
-            R.id.btnAns to "Ans", R.id.btnSwap to "±",
-            R.id.btnAc to "AC", R.id.btnDel to "DEL", R.id.btnEq to "=",
-            R.id.btnMemAdd to "M+", R.id.btnMemSub to "M-",
-            R.id.btnMemRecall to "MR", R.id.btnMemClear to "MC"
-        )
-
-        var lastAnswer: Double = 0.0
+        val lastAnswer = floatArrayOf(0.0f)
 
         fun refreshDisplay() {
             val expr = displayInput.text?.toString().orEmpty()
@@ -78,11 +71,13 @@ class MainActivity : AppCompatActivity() {
                 }
                 "=" -> {
                     try {
-                        lastAnswer = expressionEvaluator.evaluate(text)
-                        displayResult.text = formatResult(lastAnswer)
-                        input.setText(formatResult(lastAnswer))
+                        lastAnswer[0] = expressionEvaluator.evaluate(text).toFloat()
+                        displayResult.text = formatResult(lastAnswer[0].toDouble())
+                        addToHistory(text, formatResult(lastAnswer[0].toDouble()))
+                        input.setText(formatResult(lastAnswer[0].toDouble()))
                     } catch (e: ExpressionEvaluator.EvalError) {
                         displayResult.text = e.message ?: "Error"
+                        addToHistory(text, "Error")
                     }
                     return
                 }
@@ -104,15 +99,34 @@ class MainActivity : AppCompatActivity() {
                 "MC" -> {
                     memory = 0.0; updateMemoryLabel(memoryLabel); return
                 }
+                "Ans" -> formatResult(lastAnswer[0].toDouble())
                 "DEG" -> {
-                    val rad = !angleModeBtn.isChecked
+                    val rad = angleModeText.text.toString() == "RAD"
                     expressionEvaluator = ExpressionEvaluator(
                         if (rad) ExpressionEvaluator.AngleUnit.RADIAN else ExpressionEvaluator.AngleUnit.DEGREE
                     )
+                    angleModeText.text = if (rad) "RAD" else "DEG"
                     refreshDisplay(); return
                 }
-                "Ans" -> formatResult(lastAnswer)
                 "x²" -> "^(2)"
+                "x³" -> "^(3)"
+                "xʸ" -> "^"
+                "10ˣ" -> "10^("
+                "eˣ" -> "exp("
+                "√(" -> "sqrt("
+                "∛(" -> "cbrt("
+                "lg(" -> "lg("
+                "ln(" -> "ln("
+                "sin(" -> if (secondFunction) "asin(" else "sin("
+                "cos(" -> if (secondFunction) "acos(" else "cos("
+                "tan(" -> if (secondFunction) "atan(" else "tan("
+                "sinh(" -> "sinh("
+                "cosh(" -> "cosh("
+                "tanh(" -> "tanh("
+                "1/x" -> "1/("
+                "π" -> "pi"
+                "EE" -> "e"
+                "Rand" -> formatResult(Math.random())
                 "%%" -> "/(100)"
                 else -> token
             }
@@ -120,16 +134,73 @@ class MainActivity : AppCompatActivity() {
             refreshDisplay()
         }
 
-        buttons.forEach { (id, token) ->
-            findViewById<Button>(id).setOnClickListener { onButtonClick(token) }
+        fun wire(ids: List<Int>, map: (String) -> String) {
+            ids.forEach { id ->
+                findViewById<Button>(id).setOnClickListener { onButtonClick(map("" )) }
+            }
         }
 
-        // Swap angles toggle (DEG/RAD)
-        angleModeBtn.setOnCheckedChangeListener { _, isChecked ->
-            // isChecked == true  => RADIAN, false => DEGREE
+        // Helper: shared mapping used by both keypads and the currency keypad
+        fun calcMap(token: String) = onButtonClick(token)
+
+        val calcButtons = listOf(
+            R.id.btn0 to "0", R.id.btn1 to "1", R.id.btn2 to "2", R.id.btn3 to "3",
+            R.id.btn4 to "4", R.id.btn5 to "5", R.id.btn6 to "6", R.id.btn7 to "7",
+            R.id.btn8 to "8", R.id.btn9 to "9",
+            R.id.btnDot to ".", R.id.btnAc to "AC", R.id.btnDel to "DEL",
+            R.id.btnSwap to "±", R.id.btnAdd to "+", R.id.btnSub to "−",
+            R.id.btnMul to "×", R.id.btnDiv to "÷",
+            R.id.btnPercent to "%%", R.id.btnEq to "=",
+            R.id.btnMemAdd to "M+", R.id.btnMemSub to "M-",
+            R.id.btnMemRecall to "MR", R.id.btnMemClear to "MC"
+        )
+        calcButtons.forEach { (id, token) -> findViewById<Button>(id).setOnClickListener { calcMap(token) } }
+
+        // Angle mode toggle (DEG/RAD)
+        angleModeText.setOnClickListener {
+            val rad = angleModeText.text.toString() == "RAD"
             expressionEvaluator = ExpressionEvaluator(
-                if (isChecked) ExpressionEvaluator.AngleUnit.RADIAN else ExpressionEvaluator.AngleUnit.DEGREE
+                if (rad) ExpressionEvaluator.AngleUnit.RADIAN else ExpressionEvaluator.AngleUnit.DEGREE
             )
+            angleModeText.text = if (rad) "RAD" else "DEG"
+            refreshDisplay()
+        }
+
+        // 2nd toggle
+        val angleRad = { angleModeText.text.toString() == "RAD" }
+
+        val btn2nd = findViewById<Button>(R.id.btn2nd)
+        btn2nd.setOnClickListener {
+            secondFunction = !secondFunction
+            btn2nd.setTextColor(if (secondFunction) 0xFFFF4D4D.toInt() else 0xFFFFFFFF.toInt())
+        }
+
+        // Scientific keypad buttons
+        val sciButtons = listOf(
+            R.id.btnSciParenOpen to "(", R.id.btnSciParenClose to ")",
+            R.id.btnSciTenPow to "10ˣ", R.id.btnSciPow to "xʸ",
+            R.id.btnSciSq to "x²", R.id.btnSciCube to "x³",
+            R.id.btnSciInv to "1/x", R.id.btnSciFact to "!",
+            R.id.btnSciSqrt to "√(", R.id.btnSciCbrt to "∛(",
+            R.id.btnSciLg to "lg(", R.id.btnSciLn to "ln(",
+            R.id.btnSciSin to "sin(", R.id.btnSciCos to "cos(", R.id.btnSciTan to "tan(",
+            R.id.btnSciSinh to "sinh(", R.id.btnSciCosh to "cosh(", R.id.btnSciTanh to "tanh(",
+            R.id.btnSciExp to "eˣ", R.id.btnSciPi to "π", R.id.btnSciEe to "EE",
+            R.id.btnSciRand to "Rand", R.id.btnSciPercent to "%%",
+            R.id.btnSciAc to "AC", R.id.btnSciDel to "DEL", R.id.btnSciNeg to "±",
+            R.id.btnSciAdd to "+", R.id.btnSciSub to "−", R.id.btnSciMul to "×",
+            R.id.btnSciDiv to "÷", R.id.btnSciEq to "=",
+            R.id.btnSciMc to "MC", R.id.btnSciMp to "M+",
+            R.id.btnSciMm to "M-", R.id.btnSciMr to "MR"
+        )
+        sciButtons.forEach { (id, token) -> findViewById<Button>(id).setOnClickListener { calcMap(token) } }
+
+        findViewById<Button>(R.id.btnSciRad).setOnClickListener {
+            val rad = !angleRad()
+            expressionEvaluator = ExpressionEvaluator(
+                if (rad) ExpressionEvaluator.AngleUnit.RADIAN else ExpressionEvaluator.AngleUnit.DEGREE
+            )
+            angleModeText.text = if (rad) "RAD" else "DEG"
             refreshDisplay()
         }
 
@@ -138,87 +209,175 @@ class MainActivity : AppCompatActivity() {
         displayInput.isCursorVisible = false
 
         // ---------------- Converter section ----------------
-        val spinnerConversionType = findViewById<Spinner>(R.id.spinnerConversionType)
         val spinnerFromUnit = findViewById<Spinner>(R.id.spinnerFromUnit)
         val spinnerToUnit = findViewById<Spinner>(R.id.spinnerToUnit)
-        val inputValue = findViewById<EditText>(R.id.inputValue)
-        val btnConvert = findViewById<Button>(R.id.btnConvert)
-        val txtConversionResult = findViewById<TextView>(R.id.txtConversionResult)
+        val conversionResult = findViewById<TextView>(R.id.conversionResult)
+        val ratesSourceNote = findViewById<TextView>(R.id.ratesSourceNote)
 
-        val conversionTypes = listOf("Length", "Weight", "Volume", "Temperature", "Currency")
-        val lengthUnits = listOf("Millimeter", "Centimeter", "Meter", "Kilometer", "Inch", "Foot", "Yard", "Mile", "Nautical Mile")
-        val weightUnits = listOf("Milligram", "Gram", "Kilogram", "Ounce", "Pound", "Stone", "Metric Ton")
-        val volumeUnits = listOf("Milliliter", "Liter", "Cup (US)", "Pint (US)", "Quart (US)", "Gallon (US)", "Fluid Ounce (US)", "Tablespoon (US)", "Teaspoon (US)")
         val currencyUnits = CurrencyRepository.getCurrencies(this)
+        val fromAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, currencyUnits)
+        fromAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        val toAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, currencyUnits)
+        toAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        spinnerFromUnit.adapter = fromAdapter
+        spinnerToUnit.adapter = toAdapter
 
-        val conversionTypeAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, conversionTypes)
-        conversionTypeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        spinnerConversionType.adapter = conversionTypeAdapter
+        // Defaults: USD -> INR if available
+        val usdPos = currencyUnits.indexOf("USD")
+        val inrPos = currencyUnits.indexOf("INR")
+        if (usdPos >= 0) spinnerFromUnit.setSelection(usdPos)
+        if (inrPos >= 0 && inrPos != usdPos) spinnerToUnit.setSelection(inrPos)
 
-        spinnerConversionType.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
-                val units = when (conversionTypes[position]) {
-                    "Length" -> lengthUnits
-                    "Weight" -> weightUnits
-                    "Volume" -> volumeUnits
-                    "Temperature" -> listOf("Celsius", "Fahrenheit", "Kelvin")
-                    "Currency" -> currencyUnits
-                    else -> listOf()
-                }
-                val adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_item, units)
-                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-                spinnerFromUnit.adapter = adapter
-                spinnerToUnit.adapter = adapter
+        fun convertCurrency() {
+            val fromItem = spinnerFromUnit.selectedItem?.toString() ?: return
+            val toItem = spinnerToUnit.selectedItem?.toString() ?: return
+            val value = displayInput.text?.toString().orEmpty().toDoubleOrNull() ?: 0.0
+            val converted = CurrencyRepository.convert(this, value, fromItem, toItem)
+            if (converted == null) {
+                conversionResult.text = "0"
+            } else {
+                conversionResult.text = formatResult(converted)
             }
+            val dateStr = CurrencyRepository.lastDate(this)
+            ratesSourceNote.text = "Data source: ECB reference rates${if (dateStr.isNotEmpty()) " · $dateStr" else ""}"
+        }
+
+        fun swapCurrencies() {
+            val tmp = spinnerFromUnit.selectedItemPosition
+            spinnerFromUnit.setSelection(spinnerToUnit.selectedItemPosition)
+            spinnerToUnit.setSelection(tmp)
+            convertCurrency()
+        }
+
+        fun convButtonClick(token: String) {
+            val input = displayInput
+            val text = input.text.toString()
+            val insert = when (token) {
+                "AC" -> { input.setText("0"); convertCurrency(); return }
+                "DEL" -> {
+                    val next = if (text.isNotEmpty()) text.dropLast(1) else ""
+                    input.setText(next)
+                    convertCurrency()
+                    return
+                }
+                "=" -> { convertCurrency(); return }
+                "00" -> {
+                    if (text == "0") input.setText(text)
+                    else input.setText(text + "00")
+                    convertCurrency(); return
+                }
+                else -> token
+            }
+            val next = if (text == "0") insert else text + insert
+            input.setText(next)
+            convertCurrency()
+        }
+
+        spinnerFromUnit.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) { convertCurrency() }
             override fun onNothingSelected(parent: AdapterView<*>) {}
         }
-        // Trigger initial population
-        spinnerConversionType.setSelection(0, false)
-        spinnerConversionType.performItemClick(
-            spinnerConversionType.getChildAt(0), 0,
-            spinnerConversionType.adapter.getItemId(0)
+        spinnerToUnit.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) { convertCurrency() }
+            override fun onNothingSelected(parent: AdapterView<*>) {}
+        }
+        val fromCurrencyRow = findViewById<View>(R.id.fromCurrencyRow)
+        val toCurrencyRow = findViewById<View>(R.id.toCurrencyRow)
+        fromCurrencyRow.setOnClickListener { swapCurrencies() }
+        toCurrencyRow.setOnClickListener { swapCurrencies() }
+
+        val convButtons = listOf(
+            R.id.btnConv0 to "0", R.id.btnConv1 to "1", R.id.btnConv2 to "2", R.id.btnConv3 to "3",
+            R.id.btnConv4 to "4", R.id.btnConv5 to "5", R.id.btnConv6 to "6", R.id.btnConv7 to "7",
+            R.id.btnConv8 to "8", R.id.btnConv9 to "9",
+            R.id.btnConv00 to "00", R.id.btnConvDot to ".",
+            R.id.btnConvAdd to "+", R.id.btnConvSub to "−",
+            R.id.btnConvMul to "×", R.id.btnConvDiv to "÷",
+            R.id.btnConvAc to "AC", R.id.btnConvDel to "DEL", R.id.btnConvEq to "="
         )
+        convButtons.forEach { (id, token) -> findViewById<Button>(id).setOnClickListener { convButtonClick(token) } }
 
-        btnConvert.setOnClickListener {
-            val fromUnitItem = spinnerFromUnit.selectedItem
-            val toUnitItem = spinnerToUnit.selectedItem
-            val conversionTypeItem = spinnerConversionType.selectedItem
+        // Initial conversion
+        convertCurrency()
 
-            if (fromUnitItem == null || toUnitItem == null || conversionTypeItem == null) {
-                Toast.makeText(this, "Please ensure all units are selected", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
+        // ---------------- Mode switching ----------------
+        val iconHistory = findViewById<TextView>(R.id.iconHistory)
+        val iconScientific = findViewById<TextView>(R.id.iconScientific)
+        val iconCurrency = findViewById<TextView>(R.id.iconCurrency)
+        val scientificKeypad = findViewById<View>(R.id.scientificKeypad)
+        val basicKeypad = findViewById<View>(R.id.basicKeypad)
+        val converterPanel = findViewById<View>(R.id.converterPanel)
+        val converterKeypad = findViewById<View>(R.id.converterKeypad)
+        val historyPanel = findViewById<View>(R.id.historyPanel)
+
+        // Live conversion as the user types in currency mode
+        displayInput.addTextChangedListener(object : android.text.TextWatcher {
+            override fun afterTextChanged(s: android.text.Editable?) { convertCurrency() }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        })
+
+        fun setMode(mode: Mode) {
+            // Reset icon colors
+            listOf(iconHistory, iconScientific, iconCurrency).forEach { it.setTextColor(0xFF8A8A8A.toInt()) }
+            when (mode) {
+                Mode.CALCULATOR -> {
+                    iconHistory.setTextColor(0xFF8A8A8A.toInt())
+                    scientificKeypad.visibility = View.GONE
+                    basicKeypad.visibility = View.VISIBLE
+                    converterPanel.visibility = View.GONE
+                    converterKeypad.visibility = View.GONE
+                    historyPanel.visibility = View.GONE
+                    displayResult.setTextColor(0xFFFF4D4D.toInt())
+                }
+                Mode.SCIENTIFIC -> {
+                    iconScientific.setTextColor(0xFFFF4D4D.toInt())
+                    scientificKeypad.visibility = View.VISIBLE
+                    basicKeypad.visibility = View.GONE
+                    converterPanel.visibility = View.GONE
+                    converterKeypad.visibility = View.GONE
+                    historyPanel.visibility = View.GONE
+                    displayResult.setTextColor(0xFFFF4D4D.toInt())
+                }
+                Mode.HISTORY -> {
+                    iconHistory.setTextColor(0xFFFF4D4D.toInt())
+                    scientificKeypad.visibility = View.GONE
+                    basicKeypad.visibility = View.GONE
+                    converterPanel.visibility = View.GONE
+                    converterKeypad.visibility = View.GONE
+                    historyPanel.visibility = View.VISIBLE
+                    refreshHistoryPanel()
+                }
+                Mode.CURRENCY -> {
+                    iconCurrency.setTextColor(0xFFFF4D4D.toInt())
+                    scientificKeypad.visibility = View.GONE
+                    basicKeypad.visibility = View.GONE
+                    converterPanel.visibility = View.VISIBLE
+                    converterKeypad.visibility = View.VISIBLE
+                    historyPanel.visibility = View.GONE
+                    displayResult.setTextColor(0xFF666666.toInt())
+                }
             }
+        }
 
-            val fromUnit = fromUnitItem.toString()
-            val toUnit = toUnitItem.toString()
-            val conversionType = conversionTypeItem.toString()
+        var currentMode = Mode.CALCULATOR
 
-            val valueStr = inputValue.text.toString()
-            if (valueStr.isEmpty()) {
-                Toast.makeText(this, "Enter a value to convert", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
+        iconScientific.setOnClickListener {
+            if (currentMode == Mode.SCIENTIFIC) setMode(Mode.CALCULATOR) else setMode(Mode.SCIENTIFIC)
+        }
+        iconHistory.setOnClickListener {
+            if (currentMode == Mode.HISTORY) setMode(Mode.CALCULATOR) else setMode(Mode.HISTORY)
+        }
+        iconCurrency.setOnClickListener {
+            if (currentMode == Mode.CURRENCY) setMode(Mode.CALCULATOR) else setMode(Mode.CURRENCY)
+        }
 
-            val value = valueStr.toDoubleOrNull()
-            if (value == null) {
-                Toast.makeText(this, "Invalid number", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
+        setMode(Mode.CALCULATOR)
 
-            val convertedValue = when (conversionType) {
-                "Length" -> convertLength(value, fromUnit, toUnit)
-                "Weight" -> convertWeight(value, fromUnit, toUnit)
-                "Volume" -> convertVolume(value, fromUnit, toUnit)
-                "Temperature" -> convertTemperature(value, fromUnit, toUnit)
-                "Currency" -> CurrencyRepository.convert(this, value, fromUnit, toUnit)
-                else -> null
-            }
-
-            if (convertedValue == null) {
-                txtConversionResult.text = "Conversion not supported"
-            } else {
-                txtConversionResult.text = "$value $fromUnit = ${formatResult(convertedValue)} $toUnit"
-            }
+        findViewById<Button>(R.id.btnClearHistory).setOnClickListener {
+            historyByDate.clear()
+            saveHistory()
+            refreshHistoryPanel()
         }
 
         // Hide keyboard when tapping outside inputs
@@ -228,56 +387,64 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ---------------- History ----------------
+    private fun todayDate(): String = SimpleDateFormat("yyyy.MM.dd", Locale.US).format(Date())
+
+    private fun loadHistory() {
+        val prefs = getSharedPreferences("calc_history", Context.MODE_PRIVATE)
+        val dates = prefs.getStringSet("dates", linkedSetOf()) ?: linkedSetOf()
+        for (date in dates.sortedDescending()) {
+            val entries = prefs.getStringSet("history_$date", linkedSetOf())
+            if (!entries.isNullOrEmpty()) historyByDate[date] = entries.toMutableList()
+        }
+    }
+
+    private fun saveHistory() {
+        val prefs = getSharedPreferences("calc_history", Context.MODE_PRIVATE)
+        prefs.edit().clear().apply()
+        val editor = prefs.edit()
+        editor.putStringSet("dates", historyByDate.keys.toHashSet())
+        historyByDate.forEach { (date, entries) ->
+            editor.putStringSet("history_$date", entries.toHashSet())
+        }
+        editor.apply()
+    }
+
+    private fun addToHistory(expression: String, result: String) {
+        if (expression.isEmpty()) return
+        val date = todayDate()
+        historyByDate.getOrPut(date) { mutableListOf() }.add(0, "$expression=$result")
+        saveHistory()
+    }
+
+    private fun refreshHistoryPanel() {
+        val list = findViewById<LinearLayout>(R.id.historyList)
+        list.removeAllViews()
+        for ((date, entries) in historyByDate.toSortedMap(compareByDescending { it })) {
+            val dateLabel = TextView(this).apply {
+                text = date
+                setTextColor(0xFFFF4D4D.toInt())
+                textSize = 13f
+                gravity = android.view.Gravity.END
+                setPadding(0, 16, 0, 10)
+            }
+            list.addView(dateLabel)
+            val buf = StringBuilder()
+            for (entry in entries) {
+                buf.append(entry).append("\n\n")
+            }
+            val entryText = TextView(this).apply {
+                text = buf.toString().trimEnd()
+                setTextColor(0xFF999999.toInt())
+                textSize = 16f
+                gravity = android.view.Gravity.END
+            }
+            list.addView(entryText)
+        }
+    }
+
     private fun updateMemoryLabel(label: TextView) {
         label.visibility = if (memory != 0.0) View.VISIBLE else View.GONE
         if (memory != 0.0) label.text = "M = ${formatResult(memory)}"
-    }
-
-    // ---------------- Conversion helpers ----------------
-    // All length factors convert to meters; weight to grams; volume to liters.
-
-    private fun convertLength(value: Double, from: String, to: String): Double? {
-        val m = mapOf(
-            "Millimeter" to 0.001, "Centimeter" to 0.01, "Meter" to 1.0,
-            "Kilometer" to 1000.0, "Inch" to 0.0254, "Foot" to 0.3048,
-            "Yard" to 0.9144, "Mile" to 1609.344, "Nautical Mile" to 1852.0
-        )
-        return value * (m[from] ?: return null) / (m[to] ?: return null)
-    }
-
-    private fun convertWeight(value: Double, from: String, to: String): Double? {
-        val g = mapOf(
-            "Milligram" to 0.001, "Gram" to 1.0, "Kilogram" to 1000.0,
-            "Ounce" to 28.349523125, "Pound" to 453.59237,
-            "Stone" to 6350.29318, "Metric Ton" to 1_000_000.0
-        )
-        return value * (g[from] ?: return null) / (g[to] ?: return null)
-    }
-
-    private fun convertVolume(value: Double, from: String, to: String): Double? {
-        val l = mapOf(
-            "Milliliter" to 0.001, "Liter" to 1.0, "Cup (US)" to 0.2365882365,
-            "Pint (US)" to 0.473176473, "Quart (US)" to 0.946352946,
-            "Gallon (US)" to 3.785411784, "Fluid Ounce (US)" to 0.0295735295625,
-            "Tablespoon (US)" to 0.01478676478125, "Teaspoon (US)" to 0.00492892159375
-        )
-        return value * (l[from] ?: return null) / (l[to] ?: return null)
-    }
-
-    private fun convertTemperature(value: Double, from: String, to: String): Double? {
-        // Convert everything to Kelvin first (absolute scale handles negatives correctly)
-        val kelvin = when (from) {
-            "Celsius" -> value + 273.15
-            "Fahrenheit" -> (value - 32) * 5 / 9 + 273.15
-            "Kelvin" -> value
-            else -> return null
-        }
-        if (kelvin < 0) return null // below absolute zero
-        return when (to) {
-            "Celsius" -> kelvin - 273.15
-            "Fahrenheit" -> (kelvin - 273.15) * 9 / 5 + 32
-            "Kelvin" -> kelvin
-            else -> null
-        }
     }
 }

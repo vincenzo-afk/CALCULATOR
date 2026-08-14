@@ -40,7 +40,7 @@ object CurrencyRepository {
 
         // Fetch fresh rates
         try {
-            val url = URL("$BASE_URL/latest?from=USD&base=USD")
+            val url = URL("$BASE_URL/latest?from=USD")
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
                 connectTimeout = 8000
@@ -64,6 +64,9 @@ object CurrencyRepository {
         }
         return cachedRates
     }
+
+    fun lastDate(context: Context): String =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(CACHE_KEY_DATE, "") ?: ""
 
     fun getCurrencies(context: Context): List<String> =
         getRates(context).keys.sorted()

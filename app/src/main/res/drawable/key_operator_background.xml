@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dark red tint circle with coral symbol, for operator keys -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#662E2E2E">
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#3D1A1A" />
+        </shape>
+    </item>
+</ripple>

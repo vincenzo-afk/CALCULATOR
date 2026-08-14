@@ -70,9 +70,30 @@ class CalculatorLogicTest {
         assertEquals(0.0, evalRad.evaluate("cos(pi/2)"), 1e-6)
     }
 
+    @Test
+    fun advancedFunctions() {
+        // sinh/cosh/tanh take radians directly
+        assertEquals(sinh(1.0), eval.evaluate("sinh(1)"), 1e-9)
+        assertEquals(cosh(1.0), eval.evaluate("cosh(1)"), 1e-9)
+        assertEquals(tanh(1.0), eval.evaluate("tanh(1)"), 1e-9)
+        // inverse hyperbolic
+        assertEquals(asinh(1.0), eval.evaluate("asinh(1)"), 1e-9)
+        assertEquals(acosh(2.0), eval.evaluate("acosh(2)"), 1e-9)
+        // exp, 1/x, powers
+        assertEquals(E, eval.evaluate("exp(1)"), 1e-9)
+        assertEquals(0.25, eval.evaluate("inv(4)"), 1e-9)
+        assertEquals(27.0, eval.evaluate("3^3"), 1e-9)
+        assertEquals(1000.0, eval.evaluate("10^3"), 1e-9)
+    }
+
     @Test(expected = ExpressionEvaluator.EvalError.DivisionByZero::class)
     fun divisionByZero() {
         eval.evaluate("1/0")
+    }
+
+    @Test(expected = ExpressionEvaluator.EvalError.DomainError::class)
+    fun acoshDomain() {
+        eval.evaluate("acosh(0.5)")
     }
 
     @Test(expected = ExpressionEvaluator.EvalError.DomainError::class)
