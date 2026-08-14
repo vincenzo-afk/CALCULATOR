@@ -127,7 +127,19 @@ class MainActivity : AppCompatActivity() {
                 "sinh(" -> "sinh("
                 "cosh(" -> "cosh("
                 "tanh(" -> "tanh("
-                "1/x" -> "1/("
+                "1/x" -> {
+                    // Reciprocal of the current expression value (like a real 1/x key)
+                    try {
+                        val value = expressionEvaluator.evaluate(text)
+                        if (value == 0.0) {
+                            displayResult.text = "Error"
+                        } else {
+                            input.setText(formatResult(1.0 / value))
+                            refreshDisplay()
+                        }
+                    } catch (_: Exception) { /* ignore bad expression */ }
+                    return
+                }
                 "π" -> "pi"
                 "EE" -> "e"
                 "Rand" -> formatResult(Math.random())
@@ -148,7 +160,8 @@ class MainActivity : AppCompatActivity() {
             R.id.btnDot to ".", R.id.btnAc to "AC", R.id.btnDel to "DEL",
             R.id.btnSwap to "±", R.id.btnAdd to "+", R.id.btnSub to "−",
             R.id.btnMul to "×", R.id.btnDiv to "÷",
-            R.id.btnPercent to "%%", R.id.btnEq to "=",
+            R.id.btnOpenParen to "(", R.id.btnCloseParen to ")",
+            R.id.btnEq to "=",
             R.id.btnMemAdd to "M+", R.id.btnMemSub to "M-",
             R.id.btnMemRecall to "MR", R.id.btnMemClear to "MC"
         )

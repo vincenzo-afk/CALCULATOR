@@ -39,7 +39,17 @@ class ExpressionEvaluator(private val angleUnit: AngleUnit = AngleUnit.DEGREE) {
             .replace(" ", "")
             .lowercase()
         if (cleaned.isEmpty()) throw EvalError.InvalidSyntax
-        tokens = tokenize(cleaned)
+        // Auto-close any unmatched '(' so in-progress expressions like
+        // "sqrt(9", "sin(30", "2+5/(100)" evaluate cleanly (common in calculators).
+        var depth = 0
+        val normalized = StringBuilder()
+        for (ch in cleaned) {
+            if (ch == '(') depth++ else if (ch == ')') depth--
+            if (depth < 0) throw EvalError.InvalidSyntax
+            normalized.append(ch)
+        }
+        for (j in 0 until depth) normalized.append(')')
+        tokens = tokenize(normalized.toString())
         if (tokens.isEmpty()) throw EvalError.InvalidSyntax
         pos = 0
         val result = parseExpression()
@@ -254,6 +264,7 @@ class ExpressionEvaluator(private val angleUnit: AngleUnit = AngleUnit.DEGREE) {
             exp(arg)
         }
         "log" -> if (arg <= 0.0) throw EvalError.DomainError else log10(arg)
+        "lg" -> if (arg <= 0.0) throw EvalError.DomainError else log10(arg)
         "ln" -> if (arg <= 0.0) throw EvalError.DomainError else ln(arg)
         "sqrt" -> if (arg < 0.0) throw EvalError.DomainError else sqrt(arg)
         "cbrt" -> cbrt(arg)

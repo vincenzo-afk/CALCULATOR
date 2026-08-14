@@ -264,15 +264,17 @@
             <Button android:id="@+id/btnMemRecall" style="@style/BaseKeySmall" android:text="mr" />
         </LinearLayout>
 
-        <!-- Row: AC DEL +/- ÷ -->
+        <!-- Row: AC DEL +/- ÷ % -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
-            <Button android:id="@+id/btnAc" style="@style/BaseKeyAccent" android:text="AC" />
-            <Button android:id="@+id/btnDel" style="@style/BaseKeyAccent" android:text="⌫" />
-            <Button android:id="@+id/btnSwap" style="@style/BaseKeyAccent" android:text="+/−" />
-            <Button android:id="@+id/btnDiv" style="@style/OpKey" android:text="÷" />
+            android:orientation="horizontal"
+            android:weightSum="5">
+            <Button android:id="@+id/btnAc" style="@style/BaseKeyAccent" android:text="AC" android:layout_weight="1" />
+            <Button android:id="@+id/btnDel" style="@style/BaseKeyAccent" android:text="⌫" android:layout_weight="1" />
+            <Button android:id="@+id/btnSwap" style="@style/BaseKeyAccent" android:text="+/−" android:layout_weight="1" />
+            <Button android:id="@+id/btnDiv" style="@style/OpKey" android:text="÷" android:layout_weight="1" />
+            <Button android:id="@+id/btnPercent" style="@style/NumKey" android:text="%" android:layout_weight="1" />
         </LinearLayout>
 
         <!-- Row: 7 8 9 × -->
@@ -308,15 +310,17 @@
             <Button android:id="@+id/btnAdd" style="@style/OpKey" android:text="+" />
         </LinearLayout>
 
-        <!-- Row: % 0 . = -->
+        <!-- Row: ( ) 0 . = -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
-            <Button android:id="@+id/btnPercent" style="@style/NumKey" android:text="%" />
-            <Button android:id="@+id/btn0" style="@style/NumKey" android:text="0" />
-            <Button android:id="@+id/btnDot" style="@style/NumKey" android:text="." />
-            <Button android:id="@+id/btnEq" style="@style/EqualsKey" android:text="=" />
+            android:orientation="horizontal"
+            android:weightSum="5">
+            <Button android:id="@+id/btnOpenParen" style="@style/NumKey" android:text="(" android:layout_weight="1" />
+            <Button android:id="@+id/btnCloseParen" style="@style/NumKey" android:text=")" android:layout_weight="1" />
+            <Button android:id="@+id/btn0" style="@style/NumKey" android:text="0" android:layout_weight="1" />
+            <Button android:id="@+id/btnDot" style="@style/NumKey" android:text="." android:layout_weight="1" />
+            <Button android:id="@+id/btnEq" style="@style/EqualsKey" android:text="=" android:layout_weight="1" />
         </LinearLayout>
     </LinearLayout>
 
