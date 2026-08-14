@@ -3,7 +3,7 @@
     <!--
       FIXED: The parent theme is now "Theme.Material3.DayNight.NoActionBar".      This is a modern AppCompat theme that works with AppCompatActivity and prevents the crash.
     -->
-    <style name="Theme.AdvancedCalculator" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Theme.MathX" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- You can customize your theme's colors here if you want -->
         <!--
         <item name="colorPrimary">@color/purple_500</item>

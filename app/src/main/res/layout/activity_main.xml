@@ -98,6 +98,14 @@
             android:textColor="#FF4D4D"
             android:textSize="13sp"
             android:textStyle="bold" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="20dp"
+            android:text="MathX"
+            android:textColor="#FFFFFF"
+            android:textSize="15sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
     <!-- ================= HISTORY PANEL ================= -->
